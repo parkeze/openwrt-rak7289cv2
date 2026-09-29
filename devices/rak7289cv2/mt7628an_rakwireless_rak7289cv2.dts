@@ -1,0 +1,226 @@
+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+
+#include "mt7628an.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+
+/ {
+	compatible = "rakwireless,rak7289cv2", "rakwireless,rak636", "mediatek,mt7628an-soc";
+	model = "RAKwireless RAK7289CV2";
+
+	aliases {
+		led-boot = &led_eth;
+		led-failsafe = &led_eth;
+		led-upgrade = &led_eth;
+		label-mac-device = &ethernet;
+	};
+
+	/*
+	 * Same RAK636 board as the RAK7268CV2, so the LEDs, keys, modem, flash
+	 * map and SD-on-the-PHY are identical — read from RAK's own DTB, which
+	 * ships one image ("RAK636") for the whole WisGate Edge line. The one
+	 * hardware difference is the radio: the Pro carries two RAK5146 (SX1303)
+	 * concentrators on mPCIe, each a USB CDC-ACM device, where the Lite has a
+	 * single SX1302 on SPI CS1. So there is no concentrator SPI node here at
+	 * all — the parts are on USB, and userspace opens /dev/ttyACM0 and
+	 * /dev/ttyACM1. Only the flash is on SPI.
+	 */
+
+	leds {
+		compatible = "gpio-leds";
+
+		lora {
+			label = "green:lora";
+			gpios = <&gpio 15 GPIO_ACTIVE_LOW>;
+		};
+
+		lora1 {
+			label = "green:lora1";
+			gpios = <&gpio 14 GPIO_ACTIVE_LOW>;
+		};
+
+		led_eth: eth {
+			label = "green:eth";
+			gpios = <&gpio 43 GPIO_ACTIVE_LOW>;
+		};
+
+		wifi {
+			label = "orange:wifi";
+			gpios = <&gpio 44 GPIO_ACTIVE_LOW>;
+		};
+	};
+
+	keys {
+		compatible = "gpio-keys";
+
+		reset {
+			label = "reset";
+			gpios = <&gpio 38 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+
+		/*
+		 * Asserted when input power drops. BTN_7, as the stock firmware has
+		 * it: KEY_POWER would run /etc/rc.button/power, and a brownout
+		 * would power the gateway off for good.
+		 */
+		dying-gasp {
+			label = "dying-gasp";
+			gpios = <&gpio 18 GPIO_ACTIVE_LOW>;
+			linux,code = <BTN_7>;
+		};
+	};
+
+	gpio-export {
+		compatible = "gpio-export";
+		#size-cells = <0>;
+
+		/* Quectel EG95. Pulse high to reset; RAK's firmware does 1s. */
+		modem-reset {
+			gpio-export,name = "modem-reset";
+			gpio-export,output = <0>;
+			gpios = <&gpio 42 GPIO_ACTIVE_HIGH>;
+		};
+	};
+};
+
+&gpio {
+	/* Low powers the EG95. Nothing should ever turn it off. */
+	modem-power {
+		gpio-hog;
+		gpios = <41 GPIO_ACTIVE_HIGH>;
+		output-low;
+		line-name = "modem-power";
+	};
+};
+
+&state_default {
+	gpio {
+		groups = "gpio", "i2s", "spis", "wdt", "wled_an",
+			 "p0led_an", "p1led_an", "p2led_an", "p3led_an", "p4led_an";
+		function = "gpio";
+	};
+};
+
+&spi0 {
+	status = "okay";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&spi_pins>;
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <10000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "u-boot";
+				reg = <0x0 0x30000>;
+				read-only;
+			};
+
+			partition@30000 {
+				label = "u-boot-env";
+				reg = <0x30000 0x10000>;
+			};
+
+			partition@40000 {
+				label = "factory";
+				reg = <0x40000 0xe000>;
+				read-only;
+
+				nvmem-layout {
+					compatible = "fixed-layout";
+					#address-cells = <1>;
+					#size-cells = <1>;
+
+					eeprom_factory_0: eeprom@0 {
+						reg = <0x0 0x400>;
+					};
+
+					macaddr_factory_28: macaddr@28 {
+						reg = <0x28 0x6>;
+					};
+
+					macaddr_factory_2e: macaddr@2e {
+						reg = <0x2e 0x6>;
+					};
+				};
+			};
+
+			/* RAK's per-unit identity. Kept intact for a return to stock. */
+			partition@4e000 {
+				label = "pst-data";
+				reg = <0x4e000 0x2000>;
+				read-only;
+			};
+
+			partition@50000 {
+				compatible = "denx,uimage";
+				label = "firmware";
+				reg = <0x50000 0x1fb0000>;
+			};
+		};
+	};
+};
+
+&i2c {
+	status = "okay";
+};
+
+&uart1 {
+	status = "okay";
+};
+
+&uart2 {
+	status = "okay";
+};
+
+&gdma {
+	status = "okay";
+};
+
+&ethernet {
+	nvmem-cells = <&macaddr_factory_28>;
+	nvmem-cell-names = "mac-address";
+};
+
+/*
+ * The SD slot is on the ethernet PHY's P1-P4 pads, which is why the board has
+ * one port. The stock kernel claims pins 22-29 for it with I2C still live.
+ */
+&pinctrl {
+	ephy-digital;
+
+	sdxc_iot_mode: sdxc_iot_mode {
+		esd {
+			groups = "esd";
+			function = "iot";
+		};
+
+		sdxc {
+			groups = "sdmode";
+			function = "sdxc";
+		};
+	};
+};
+
+&sdhci {
+	status = "okay";
+
+	pinctrl-0 = <&sdxc_iot_mode>;
+	pinctrl-1 = <&sdxc_iot_mode>;
+};
+
+&wmac {
+	status = "okay";
+
+	nvmem-cells = <&eeprom_factory_0>, <&macaddr_factory_2e>;
+	nvmem-cell-names = "eeprom", "mac-address";
+};
