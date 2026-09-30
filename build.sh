@@ -40,7 +40,14 @@ die() { printf '\033[31merror\033[0m %s\n' "$*" >&2; exit 1; }
 
 if [ ! -d "${SRC}/.git" ]; then
   log "Cloning OpenWrt v${VERSION}"
-  git clone --depth 1 --branch "v${VERSION}" https://github.com/openwrt/openwrt.git "${SRC}"
+  # CI caches .build/openwrt/dl (actions/cache), which on a warm run recreates
+  # ${SRC} without a .git — so a plain clone lands on a non-empty directory and
+  # dies. Clone into a temp dir and fold any cached dl/ back in.
+  rm -rf "${SRC}.tmp"
+  git clone --depth 1 --branch "v${VERSION}" https://github.com/openwrt/openwrt.git "${SRC}.tmp"
+  [ -d "${SRC}/dl" ] && mv "${SRC}/dl" "${SRC}.tmp/dl"
+  rm -rf "${SRC}"
+  mv "${SRC}.tmp" "${SRC}"
 fi
 cd "${SRC}"
 [ "$(git describe --tags --exact-match 2>/dev/null)" = "v${VERSION}" ] \
