@@ -38,8 +38,24 @@ Linux, on a case-sensitive filesystem, with
 A RAK636 module, as in the RAK7268CV2: MT7628AN, 128MB RAM, 32MB W25Q256 SPI
 NOR, Quectel EG95 LTE on USB, one 10/100 ethernet port (PoE in), a microSD slot
 on the ethernet PHY's P1-P4 pads, and a 2.4GHz Wi-Fi radio. The flash map, the
-four GPIO LEDs, the reset button, the dying-gasp input and the modem's power and
-reset lines are the module's, in the shared dtsi.
+four GPIO LEDs, the reset button and the modem's power line are the module's,
+in the shared dtsi.
+
+The rest differs between RAK636 gateways, and RAK records it per unit: a
+hardware descriptor in the factory partition at 0x2000 (`RAK`, an md5, a
+compression byte, a 4-hex-digit length, then JSON) names the modem, LoRa and
+GNSS pins and the unit's capabilities. This unit's says, and the bench agreed:
+
+| Line | GPIO | Exported as |
+|---|---|---|
+| Modem reset (pulse high) | 2 | `/sys/class/gpio/modem-reset` |
+| LoRa card in slot 1, reset (active low) | 17 | `/sys/class/gpio/lora-reset` |
+| GNSS reset (active low) | 16 | `/sys/class/gpio/gnss-reset` |
+| Modem power (low is on) | 41 | held by the kernel |
+| Dying gasp | 18 | `BTN_7` |
+
+Capabilities: `dying_gasp solar_battery hwwdg lbt`. GPIO 42, the modem reset
+on the RAK7268CV2, does nothing here.
 
 What differs from the Lite, checked on a unit (2026-10-26):
 
@@ -54,7 +70,7 @@ What differs from the Lite, checked on a unit (2026-10-26):
   uses for Modbus to the power board (hardware watchdog, solar battery). On the
   unit checked, nothing answered on it over PoE.
 - **The panel has six lights**, mapped by eye: LoRa 1 is GPIO 15
-  (`green:lora`), LoRa 2 is GPIO 14 (`green:lora1`), ETH is GPIO 43 (`green:lan`,
+  (`green:lora-1`), LoRa 2 is GPIO 14 (`green:lora-2`), ETH is GPIO 43 (`green:lan`,
   which also lights the RJ45 jack's green LED and follows the link), WLAN is
   GPIO 44 (`orange:wlan`). PWR is always on, LTE is the EG95's own status
   light, and the jack's orange LED is not driven by the SoC.

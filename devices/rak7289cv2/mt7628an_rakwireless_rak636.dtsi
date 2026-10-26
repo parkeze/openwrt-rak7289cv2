@@ -17,13 +17,17 @@
 	leds {
 		compatible = "gpio-leds";
 
-		lora {
-			label = "green:lora";
+		lora-1 {
+			color = <LED_COLOR_ID_GREEN>;
+			function = "lora";
+			function-enumerator = <1>;
 			gpios = <&gpio 15 GPIO_ACTIVE_LOW>;
 		};
 
-		lora1 {
-			label = "green:lora1";
+		lora-2 {
+			color = <LED_COLOR_ID_GREEN>;
+			function = "lora";
+			function-enumerator = <2>;
 			gpios = <&gpio 14 GPIO_ACTIVE_LOW>;
 		};
 
@@ -41,35 +45,13 @@
 		};
 	};
 
-	keys {
+	keys: keys {
 		compatible = "gpio-keys";
 
 		reset {
 			label = "reset";
 			gpios = <&gpio 38 GPIO_ACTIVE_LOW>;
 			linux,code = <KEY_RESTART>;
-		};
-
-		/*
-		 * Asserted when input power drops. BTN_7, as the vendor firmware
-		 * has it: KEY_POWER would run /etc/rc.button/power, and a
-		 * brownout would then power the gateway off for good.
-		 */
-		dying-gasp {
-			label = "dying-gasp";
-			gpios = <&gpio 18 GPIO_ACTIVE_LOW>;
-			linux,code = <BTN_7>;
-		};
-	};
-
-	gpio-export {
-		compatible = "gpio-export";
-
-		/* Quectel EG95 reset: pulse high, the vendor firmware for 1 s. */
-		modem-reset {
-			gpio-export,name = "modem-reset";
-			gpio-export,output = <0>;
-			gpios = <&gpio 42 GPIO_ACTIVE_HIGH>;
 		};
 	};
 };
