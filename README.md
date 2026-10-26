@@ -53,8 +53,11 @@ What differs from the Lite, checked on a unit (2026-10-26):
 - **A CH340 USB-serial** on the hub (`kmod-usb-serial-ch341`), which ChirpStack
   uses for Modbus to the power board (hardware watchdog, solar battery). On the
   unit checked, nothing answered on it over PoE.
-- **The panel has six lights**, PWR, ETH, LoRa 1, WLAN, LTE and LoRa 2. Four are
-  GPIOs; PWR and LTE are not driven by the SoC.
+- **The panel has six lights**, mapped by eye: LoRa 1 is GPIO 15
+  (`green:lora`), LoRa 2 is GPIO 14 (`green:lora1`), ETH is GPIO 43 (`green:lan`,
+  which also lights the RJ45 jack's green LED and follows the link), WLAN is
+  GPIO 44 (`orange:wlan`). PWR is always on, LTE is the EG95's own status
+  light, and the jack's orange LED is not driven by the SoC.
 
 Flash map, identical to the vendor's so the bootloader, calibration and RAK's
 unit data are untouched:
@@ -69,8 +72,7 @@ unit data are untouched:
 
 ### Not yet verified on hardware
 
-- **Which panel light each GPIO LED is**, and which `/dev/ttyACM*` is LoRa1 or
-  LoRa2. The hub port (`1-1.2`, `1-1.3`) is stable where enumeration order is
+- **Which `/dev/ttyACM*` is LoRa1 or LoRa2.** The hub port (`1-1.2`, `1-1.3`) is stable where enumeration order is
   not.
 - **Whether this revision has RAK's power-board watchdog**, which reboots a
   newer unit on DC power every ~10 minutes unless fed over the CH340
