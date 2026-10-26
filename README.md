@@ -1,8 +1,12 @@
 # openwrt-rak7289cv2
 
 OpenWrt device support for the RAKwireless RAK7289CV2 (WisGate Edge Pro V2),
-and the ImageBuilders built with it. OpenWrt 24.10.0, `ramips/mt76x8`, profile
+and the ImageBuilders built with it. OpenWrt 25.12.6, `ramips/mt76x8`, profile
 `rakwireless_rak7289cv2`.
+
+The device tree and recipe are the ones prepared for upstream OpenWrt (the
+shared `mt7628an_rakwireless_rak636.dtsi` is common to the RAK7268CV2). Once a
+release carries them, this repo is no longer needed.
 
 Built from [openwrt-device-template](https://github.com/parkeze/openwrt-device-template).
 
@@ -13,7 +17,7 @@ anything that fetches an official ImageBuilder and checks it against
 `sha256sums` only needs a different base URL:
 
 ```
-https://github.com/parkeze/openwrt-rak7289cv2/releases/download/24.10.0-1/
+https://github.com/parkeze/openwrt-rak7289cv2/releases/download/25.12.6-1/
 ```
 
 The ImageBuilder is the release's own tree with this device added, built from
@@ -23,7 +27,7 @@ matches the release's kmods, so every upstream kmod and package still installs.
 ## Building
 
 ```bash
-./build.sh 24.10.0 ramips mt76x8 out
+./build.sh 25.12.6 ramips mt76x8 out
 ```
 
 Linux, on a case-sensitive filesystem, with
@@ -31,23 +35,26 @@ Linux, on a case-sensitive filesystem, with
 
 ## RAK7289CV2
 
-A RAK636 module — the same board as the RAK7268CV2. MT7628AN, 128MB RAM, 32MB
-W25Q256 SPI NOR, Quectel EG95 LTE on USB, one 10/100 ethernet port, a microSD
-slot on the ethernet PHY's P1-P4 pads, and a 2.4GHz Wi-Fi radio. RAK ships one
-firmware image ("RAK636") for the whole WisGate Edge line, so the device tree,
-flash map and GPIOs here are read directly from that image and are identical to
-the RAK7268CV2's.
+A RAK636 module, as in the RAK7268CV2: MT7628AN, 128MB RAM, 32MB W25Q256 SPI
+NOR, Quectel EG95 LTE on USB, one 10/100 ethernet port (PoE in), a microSD slot
+on the ethernet PHY's P1-P4 pads, and a 2.4GHz Wi-Fi radio. The flash map, the
+four GPIO LEDs, the reset button, the dying-gasp input and the modem's power and
+reset lines are the module's, in the shared dtsi.
 
-**The one difference is the radio.** The Pro is 16 channels: two RAK5146
-(SX1303) concentrators on mPCIe, each presenting as a USB CDC-ACM device
-(`/dev/ttyACM0`, `/dev/ttyACM1`). Where the Lite has a single SX1302 on SPI
-CS1, this board has nothing on SPI CS1 — the concentrators are on USB. So the
-device tree here carries no concentrator SPI node, and the image pulls
-`kmod-usb-acm`. The SX1303's own STM32 owns its reset line over USB; there is
-no reset GPIO for the host to drive.
+What differs from the Lite, checked on a unit (2026-10-26):
 
-The slot 1 concentrator's GNSS is presented on `/dev/ttyS1` (via gpsd in the
-stock firmware).
+- **The radios are on USB.** Up to two RAK5146 (SX1303) mPCIe cards, each a
+  USB CDC-ACM device (`/dev/ttyACM*`, `kmod-usb-acm`) behind an internal USB
+  hub: the modem on hub port 1, the first card on port 2, a CH340 on port 4,
+  port 3 presumably the second card. Nothing on SPI CS1, and no reset GPIO for
+  the host: the card's own STM32 owns it.
+- **GNSS on UART1** (`/dev/ttyS1`), NMEA at 9600.
+- **No I2C devices**, so no RGB light.
+- **A CH340 USB-serial** on the hub (`kmod-usb-serial-ch341`), which ChirpStack
+  uses for Modbus to the power board (hardware watchdog, solar battery). On the
+  unit checked, nothing answered on it over PoE.
+- **The panel has six lights**, PWR, ETH, LoRa 1, WLAN, LTE and LoRa 2. Four are
+  GPIOs; PWR and LTE are not driven by the SoC.
 
 Flash map, identical to the vendor's so the bootloader, calibration and RAK's
 unit data are untouched:
@@ -62,14 +69,12 @@ unit data are untouched:
 
 ### Not yet verified on hardware
 
-The device tree, flash map, LEDs and modem GPIOs come from RAK's shipping
-firmware and match the RAK7268CV2, which has been on the bench. Two things want
-a unit to confirm:
-
-- **Which `/dev/ttyACM*` is which slot.** USB enumeration order is not
-  guaranteed to match the panel's LoRa1/LoRa2. Confirm before trusting the
-  slot-to-radio mapping.
-- **That `/dev/ttyS1` GNSS is populated** and answers.
+- **Which panel light each GPIO LED is**, and which `/dev/ttyACM*` is LoRa1 or
+  LoRa2. The hub port (`1-1.2`, `1-1.3`) is stable where enumeration order is
+  not.
+- **Whether this revision has RAK's power-board watchdog**, which reboots a
+  newer unit on DC power every ~10 minutes unless fed over the CH340
+  (chirpstack/chirpstack-gateway-os#155).
 
 ### Installing
 
@@ -82,7 +87,12 @@ The stock Ralink U-Boot has a TFTP menu on the serial console (57600 8N1,
   `squashfs-sysupgrade.bin` to the firmware partition.
 - Never 7 or 9: those rewrite the bootloader.
 
-Installing from the running stock firmware over the network needs no U-Boot:
+U-Boot's network needs a host that accepts its MAC. On the RAK7268CV2 the stock
+environment has `ethaddr=03:17:73:AB:CD:EF`, a multicast address that switches,
+Wi-Fi and macOS all drop, and it cannot be changed from the prompt; check this
+unit's with `fw_printenv ethaddr`. A Linux or Windows machine on a direct cable
+works. Installing from the running stock firmware over the network needs no
+U-Boot:
 
 ```sh
 wget -O /tmp/fw.bin http://<host>/openwrt-...-squashfs-sysupgrade.bin

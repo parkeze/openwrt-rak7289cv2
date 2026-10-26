@@ -1,31 +1,29 @@
-diff --git a/package/boot/uboot-envtools/files/ramips b/package/boot/uboot-envtools/files/ramips
-index 3416876..13b590b 100644
---- a/package/boot/uboot-envtools/files/ramips
-+++ b/package/boot/uboot-envtools/files/ramips
-@@ -60,6 +60,7 @@ buffalo,wsr-600dhp|\
+diff --git a/package/boot/uboot-tools/uboot-envtools/files/ramips b/package/boot/uboot-tools/uboot-envtools/files/ramips
+index b4b1ad4a65..24e4072f26 100644
+--- a/package/boot/uboot-tools/uboot-envtools/files/ramips
++++ b/package/boot/uboot-tools/uboot-envtools/files/ramips
+@@ -100,6 +100,7 @@ buffalo,wsr-600dhp|\
  kroks,kndrt31r16|\
  kroks,kndrt31r19|\
  mediatek,linkit-smart-7688|\
 +rakwireless,rak7289cv2|\
  samknows,whitebox-v8|\
  xiaomi,mi-router-4c|\
- xiaomi,miwifi-nano|\
+ xiaomi,miwifi-3a|\
 diff --git a/target/linux/ramips/image/mt76x8.mk b/target/linux/ramips/image/mt76x8.mk
-index 953dfeb..0487642 100644
+index a079a216a8..fcb40e96ad 100644
 --- a/target/linux/ramips/image/mt76x8.mk
 +++ b/target/linux/ramips/image/mt76x8.mk
-@@ -521,6 +521,17 @@ define Device/rakwireless_rak633
+@@ -718,6 +718,15 @@ define Device/rakwireless_rak633
  endef
  TARGET_DEVICES += rakwireless_rak633
-
+ 
 +define Device/rakwireless_rak7289cv2
 +  IMAGE_SIZE := 32448k
-+  DEVICE_VENDOR := RAKwireless
++  DEVICE_VENDOR := Rakwireless
 +  DEVICE_MODEL := RAK7289CV2
-+  DEVICE_PACKAGES := kmod-usb2 kmod-usb-ohci kmod-usb-acm kmod-mmc-mtk \
-+	kmod-i2c-mt7628 kmod-usb-serial-option kmod-usb-net-qmi-wwan \
-+	uboot-envtools
-+  SUPPORTED_DEVICES += rakwireless,rak636
++  DEVICE_PACKAGES := kmod-sdhci-mt7620 kmod-usb2 kmod-usb-acm kmod-usb-ohci \
++	kmod-usb-net-qmi-wwan kmod-usb-serial-ch341 kmod-usb-serial-option uqmi
 +endef
 +TARGET_DEVICES += rakwireless_rak7289cv2
 +
@@ -33,29 +31,28 @@ index 953dfeb..0487642 100644
    IMAGE_SIZE := 14272k
    DEVICE_VENDOR := RAVPower
 diff --git a/target/linux/ramips/mt76x8/base-files/etc/board.d/01_leds b/target/linux/ramips/mt76x8/base-files/etc/board.d/01_leds
-index 00e5086..6bd403b 100644
+index 8e4c85ef62..589d391f52 100644
 --- a/target/linux/ramips/mt76x8/base-files/etc/board.d/01_leds
 +++ b/target/linux/ramips/mt76x8/base-files/etc/board.d/01_leds
-@@ -67,6 +67,10 @@ mediatek,linkit-smart-7688)
- oraybox,x1)
- 	ucidef_set_led_netdev "wifi" "wifi" "blue:status" "wlan0"
- 	;;
-+rakwireless,rak7289cv2)
-+	ucidef_set_led_switch "eth" "eth" "green:eth" "switch0" "0x01"
-+	ucidef_set_led_wlan "wifi" "wifi" "orange:wifi" "phy0tpt"
-+	;;
+@@ -81,6 +81,9 @@ oraybox,x1)
  rakwireless,rak633)
  	ucidef_set_led_netdev "wifi_led" "wifi" "blue:wifi" "wlan0"
  	;;
++rakwireless,rak7289cv2)
++	ucidef_set_led_switch "lan" "lan" "green:lan" "switch0" "0x01"
++	;;
+ tama,w06)
+ 	ucidef_set_led_netdev "wan" "WAN" "green:wan" "eth0"
+ 	ucidef_set_led_wlan "wlan" "WLAN" "green:wlan" "phy0tpt"
 diff --git a/target/linux/ramips/mt76x8/base-files/etc/board.d/02_network b/target/linux/ramips/mt76x8/base-files/etc/board.d/02_network
-index 616baa8..0adb7f3 100644
+index c25eb3db33..da779e412e 100644
 --- a/target/linux/ramips/mt76x8/base-files/etc/board.d/02_network
 +++ b/target/linux/ramips/mt76x8/base-files/etc/board.d/02_network
-@@ -19,6 +19,7 @@ ramips_setup_interfaces()
- 	hiwifi,hc5611|\
- 	mediatek,linkit-smart-7688|\
- 	minew,g1-c|\
-+	rakwireless,rak7289cv2|\
+@@ -23,6 +23,7 @@ ramips_setup_interfaces()
  	onion,omega2p|\
  	onion,omega2|\
+ 	qding,qc202|\
++	rakwireless,rak7289cv2|\
  	ravpower,rp-wd009|\
+ 	tama,w06|\
+ 	tplink,re200-v2|\

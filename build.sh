@@ -3,12 +3,14 @@
 # Build an OpenWrt release's ImageBuilder with the devices in this repo added.
 #
 #   ./build.sh <openwrt-version> <target> <subtarget> <out-dir>
-#   ./build.sh 24.10.0 ramips mt76x8 out
+#   ./build.sh 25.12.6 ramips mt76x8 out
 #
-# Every devices/<board>/ holds a DTS and a patch against the OpenWrt tree. Both
-# are applied to the release tag, only those devices are enabled, and <out-dir>
-# receives the ImageBuilder, each device's plain-OpenWrt images, and a
-# sha256sums in the same format downloads.openwrt.org publishes.
+# Every devices/<board>/ holds a DTS (and any dtsi it includes), a patch against
+# the OpenWrt tree, and optionally package/, OpenWrt packages the device needs
+# that the release does not have. All are applied to the release tag, only
+# those devices are enabled, and <out-dir> receives the ImageBuilder (with
+# those packages in it), each device's plain-OpenWrt images, and a sha256sums
+# in the same format downloads.openwrt.org publishes.
 #
 # The kmods still come from downloads.openwrt.org. A kmod installs only against
 # the kernel it was built for, identified by a hash of the kernel config (the
@@ -16,7 +18,8 @@
 # its config.buildinfo, and its feeds at the commits in feeds.buildinfo. Both
 # matter, because every selected kmod merges its own symbols into the kernel
 # config: turning off ALL_KMODS, or leaving out a feed's kmods, changes the
-# hash. A device adds a DTS and an image recipe and touches neither. The result
+# hash. A device adds a DTS and an image recipe and touches neither, and a
+# device kmod is built out of tree, so it adds nothing to the config. The result
 # is checked below rather than assumed: a mismatch builds fine and then fails
 # every kmod at `make image`.
 #
@@ -60,8 +63,9 @@ git clean -fdq -e /package/feeds -- target package
 devices=""
 for dir in "${ROOT}"/devices/*/; do
   log "Applying $(basename "${dir}")"
-  cp "${dir}"*.dts "target/linux/${TARGET}/dts/"
+  cp "${dir}"*.dts* "target/linux/${TARGET}/dts/"
   git apply "${dir}openwrt.patch"
+  [ -d "${dir}package" ] && cp -R "${dir}package/." package/
   devices="${devices} $(sed -n 's/^+define Device\/\(.*\)$/\1/p' "${dir}openwrt.patch")"
 done
 [ -n "${devices// }" ] || die "no devices found"
@@ -117,6 +121,31 @@ log "Building"
 make -j"$(nproc)" IGNORE_ERRORS=m || make -j1 V=s IGNORE_ERRORS=m
 
 bin="bin/targets/${TARGET}/${SUBTARGET}"
+
+# The ImageBuilder's local repository (packages/) only gets the kernel, libc
+# and base-files; every other package is fetched from the release. A device
+# kmod exists nowhere but here, so it is added to that repository, beside the
+# kernel it was built against. IGNORE_ERRORS=m would also have passed one that
+# failed to build, which is caught here rather than in someone's image build.
+ib="$(ls "${bin}"/openwrt-imagebuilder-*.tar.zst)"
+ibname="$(basename "${ib}" .tar.zst)"
+stage="$(mktemp -d)"
+mkdir -p "${stage}/${ibname}/packages"
+for pkg in "${ROOT}"/devices/*/package/*/; do
+  [ -f "${pkg}Makefile" ] || continue
+  kmod="kmod-$(sed -n 's/^PKG_NAME:=//p' "${pkg}Makefile")"
+  file="$(find "${bin}/packages" -name "${kmod}[-_][0-9]*" | head -n1)"
+  [ -n "${file}" ] || die "${kmod} did not build"
+  cp "${file}" "${stage}/${ibname}/packages/"
+  log "Adding $(basename "${file}") to the ImageBuilder"
+done
+if [ -n "$(ls -A "${stage}/${ibname}/packages")" ]; then
+  zstd -dqf "${ib}" -o "${stage}/ib.tar"
+  ( cd "${stage}" && tar -rf ib.tar "${ibname}"/packages/* )
+  zstd -qf -T0 -19 --rm "${stage}/ib.tar" -o "${ib}"
+fi
+rm -rf "${stage}"
+
 cp "${bin}"/openwrt-imagebuilder-*.tar.zst "${bin}"/*-initramfs-kernel.bin \
    "${bin}"/*-squashfs-sysupgrade.bin "${OUT}/"
 ( cd "${OUT}" && sha256sum -b -- *.tar.zst *.bin > sha256sums )
