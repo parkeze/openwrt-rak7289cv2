@@ -57,6 +57,10 @@ jobs:
           restore-keys: dl-${{ env.OPENWRT_VERSION }}-
 
       - run: ./build.sh "${OPENWRT_VERSION}" "${TARGET}" "${SUBTARGET}" out
+        env:
+          # A snapshot's commit is looked up on the GitHub API, which limits
+          # unauthenticated calls per IP, and a runner's IP is shared.
+          GITHUB_TOKEN: ${{ github.token }}
 
       - uses: actions/upload-artifact@v4
         with:

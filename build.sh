@@ -2,8 +2,9 @@
 #
 # Build an OpenWrt release's ImageBuilder with the devices in this repo added.
 #
-#   ./build.sh <openwrt-version> <target> <subtarget> <out-dir>
+#   ./build.sh <openwrt-version | snapshot> <target> <subtarget> <out-dir>
 #   ./build.sh 25.12.6 ramips mt76x8 out
+#   ./build.sh snapshot ramips mt76x8 out
 #
 # Every devices/<board>/ holds a DTS (and any dtsi it includes), a patch against
 # the OpenWrt tree, and optionally package/, OpenWrt packages the device needs
@@ -27,34 +28,55 @@
 
 set -euo pipefail
 
-VERSION="${1:?usage: build.sh <openwrt-version> <target> <subtarget> <out-dir>}"
+VERSION="${1:?usage: build.sh <openwrt-version | snapshot> <target> <subtarget> <out-dir>}"
 TARGET="${2:?}" SUBTARGET="${3:?}"
 OUT="$(mkdir -p "${4:?}" && cd "$4" && pwd)"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC="${OPENWRT_SRC:-${ROOT}/.build/openwrt}"
-RELEASE="https://downloads.openwrt.org/releases/${VERSION}/targets/${TARGET}/${SUBTARGET}"
 
 log() { printf '\033[36m==>\033[0m %s\n' "$*"; }
 die() { printf '\033[31merror\033[0m %s\n' "$*" >&2; exit 1; }
+
+# A snapshot is main at the commit the buildbot last built the target from,
+# which is what upstream reviews a device against. Its kmods, feeds and config
+# are published the same way a release's are, so everything below holds.
+if [ "${VERSION}" = snapshot ]; then
+  RELEASE="https://downloads.openwrt.org/snapshots/targets/${TARGET}/${SUBTARGET}"
+  REF="$(curl -fsSL "${RELEASE}/version.buildinfo")"
+  # It names the commit by its short hash, which a shallow fetch cannot take.
+  REF="$(curl -fsSL -H 'Accept: application/vnd.github.sha' \
+    ${GITHUB_TOKEN:+-H "Authorization: Bearer ${GITHUB_TOKEN}"} \
+    "https://api.github.com/repos/openwrt/openwrt/commits/${REF#*-}")"
+  FETCH="${REF}"
+else
+  RELEASE="https://downloads.openwrt.org/releases/${VERSION}/targets/${TARGET}/${SUBTARGET}"
+  REF="v${VERSION}"
+  FETCH="refs/tags/${REF}:refs/tags/${REF}"
+fi
 
 # OpenWrt's configure scripts refuse root without this.
 [ "$(id -u)" = 0 ] && export FORCE_UNSAFE_CONFIGURE=1
 
 if [ ! -d "${SRC}/.git" ]; then
-  log "Cloning OpenWrt v${VERSION}"
+  log "Cloning OpenWrt ${REF}"
   # CI caches .build/openwrt/dl (actions/cache), which on a warm run recreates
   # ${SRC} without a .git — so a plain clone lands on a non-empty directory and
-  # dies. Clone into a temp dir and fold any cached dl/ back in.
+  # dies. Clone into a temp dir and fold any cached dl/ back in. One commit
+  # deep: the build runs `git log` on every package directory, and a partial
+  # clone answers each of those by fetching from GitHub, which ran a snapshot
+  # build past six hours before the toolchain finished.
   rm -rf "${SRC}.tmp"
-  git clone --depth 1 --branch "v${VERSION}" https://github.com/openwrt/openwrt.git "${SRC}.tmp"
+  git init -q "${SRC}.tmp"
+  git -C "${SRC}.tmp" fetch -q --depth 1 https://github.com/openwrt/openwrt.git "${FETCH}"
+  git -C "${SRC}.tmp" checkout -q "${REF}"
   [ -d "${SRC}/dl" ] && mv "${SRC}/dl" "${SRC}.tmp/dl"
   rm -rf "${SRC}"
   mv "${SRC}.tmp" "${SRC}"
 fi
 cd "${SRC}"
-[ "$(git describe --tags --exact-match 2>/dev/null)" = "v${VERSION}" ] \
-  || die "${SRC} is not a checkout of v${VERSION}"
+[ "$(git rev-parse HEAD)" = "$(git rev-parse -q --verify "${REF}^{commit}")" ] \
+  || die "${SRC} is not a checkout of ${REF}"
 
 # Back to the pristine tag, keeping dl/, the feeds and the build dirs.
 git checkout -q -- .
@@ -108,11 +130,11 @@ make -j"$(nproc)" target/linux/compile
 # Checked as soon as the kernel is built, since everything after this is
 # the long part and would be wasted on a kernel no release kmod will load into.
 vermagic="$(cat build_dir/target-*/linux-${TARGET}_${SUBTARGET}/linux-*/.vermagic)"
-kmods="$(curl -fsSL "${RELEASE}/kmods/" | sed -n 's/.*href="\([0-9][^"/]*\)\/".*/\1/p' | head -n1)"
-case "${kmods}" in
-  *"-${vermagic}") log "vermagic ${vermagic} matches the release's kmods" ;;
-  *) die "vermagic ${vermagic} does not match the release's kmods (${kmods})" ;;
-esac
+# A snapshot keeps the kmods of its last few kernels side by side.
+kmods="$(curl -fsSL "${RELEASE}/kmods/" | sed -n 's/.*href="\([0-9][^"/]*\)\/".*/\1/p')"
+echo "${kmods}" | grep -q -- "-${vermagic}\$" \
+  || die "vermagic ${vermagic} does not match the release's kmods (${kmods//$'\n'/ })"
+log "vermagic ${vermagic} matches the release's kmods"
 
 log "Building"
 # A kmod from a feed that fails to compile costs nothing here, since its
