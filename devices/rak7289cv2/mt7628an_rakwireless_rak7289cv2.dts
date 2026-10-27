@@ -16,17 +16,20 @@
 			gpios = <&gpio 2 GPIO_ACTIVE_HIGH>;
 		};
 
-		/* The LoRa card in the first mPCIe slot. */
+		/*
+		 * The LoRa card in the first mPCIe slot. gpio-export,output is
+		 * the raw level, so <1> releases this and the GNSS reset.
+		 */
 		lora-reset {
 			gpio-export,name = "lora-reset";
-			gpio-export,output = <0>;
+			gpio-export,output = <1>;
 			gpios = <&gpio 17 GPIO_ACTIVE_LOW>;
 		};
 
 		/* The u-blox GNSS receiver on UART1. */
 		gnss-reset {
 			gpio-export,name = "gnss-reset";
-			gpio-export,output = <0>;
+			gpio-export,output = <1>;
 			gpios = <&gpio 16 GPIO_ACTIVE_LOW>;
 		};
 	};
