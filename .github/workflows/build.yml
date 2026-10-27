@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
 
 env:
-  OPENWRT_VERSION: '25.12.6'
+  OPENWRT_VERSION: 'snapshot'
   TARGET: ramips
   SUBTARGET: mt76x8
 
