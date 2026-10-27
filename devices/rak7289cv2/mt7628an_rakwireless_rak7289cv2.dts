@@ -48,6 +48,14 @@
 	};
 };
 
+/* GPIO 18, the dying gasp input, is PWM0 unless set to GPIO here. */
+&state_default {
+	pwm0 {
+		groups = "pwm0";
+		function = "gpio";
+	};
+};
+
 /* GNSS receiver, NMEA at 9600 baud. */
 &uart1 {
 	status = "okay";
