@@ -41,7 +41,7 @@
 	 * it: KEY_POWER would run /etc/rc.button/power, and a brownout would
 	 * then power the gateway off for good.
 	 */
-	dying-gasp {
+	key-dying-gasp {
 		label = "dying-gasp";
 		gpios = <&gpio 18 GPIO_ACTIVE_LOW>;
 		linux,code = <BTN_7>;

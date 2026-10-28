@@ -34,12 +34,13 @@ diff --git a/target/linux/ramips/mt76x8/base-files/etc/board.d/01_leds b/target/
 index 8e4c85ef62..589d391f52 100644
 --- a/target/linux/ramips/mt76x8/base-files/etc/board.d/01_leds
 +++ b/target/linux/ramips/mt76x8/base-files/etc/board.d/01_leds
-@@ -81,6 +81,9 @@ oraybox,x1)
+@@ -81,6 +81,10 @@ oraybox,x1)
  rakwireless,rak633)
  	ucidef_set_led_netdev "wifi_led" "wifi" "blue:wifi" "wlan0"
  	;;
 +rakwireless,rak7289cv2)
 +	ucidef_set_led_switch "lan" "lan" "green:lan" "switch0" "0x01"
++	ucidef_set_led_wlan "wlan" "wlan" "orange:wlan" "phy0tpt"
 +	;;
  tama,w06)
  	ucidef_set_led_netdev "wan" "WAN" "green:wan" "eth0"

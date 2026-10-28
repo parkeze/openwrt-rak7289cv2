@@ -17,38 +17,37 @@
 	leds {
 		compatible = "gpio-leds";
 
-		lora-1 {
+		led-lora-1 {
 			color = <LED_COLOR_ID_GREEN>;
 			function = "lora";
 			function-enumerator = <1>;
 			gpios = <&gpio 15 GPIO_ACTIVE_LOW>;
 		};
 
-		lora-2 {
+		led-lora-2 {
 			color = <LED_COLOR_ID_GREEN>;
 			function = "lora";
 			function-enumerator = <2>;
 			gpios = <&gpio 14 GPIO_ACTIVE_LOW>;
 		};
 
-		led_lan: lan {
+		led_lan: led-lan {
 			color = <LED_COLOR_ID_GREEN>;
 			function = LED_FUNCTION_LAN;
 			gpios = <&gpio 43 GPIO_ACTIVE_LOW>;
 		};
 
-		wlan {
+		led-wlan {
 			color = <LED_COLOR_ID_ORANGE>;
 			function = LED_FUNCTION_WLAN;
 			gpios = <&gpio 44 GPIO_ACTIVE_LOW>;
-			linux,default-trigger = "phy0tpt";
 		};
 	};
 
 	keys: keys {
 		compatible = "gpio-keys";
 
-		reset {
+		key-reset {
 			label = "reset";
 			gpios = <&gpio 38 GPIO_ACTIVE_LOW>;
 			linux,code = <KEY_RESTART>;
@@ -58,7 +57,7 @@
 
 &gpio {
 	/* Low powers the EG95. */
-	modem-power {
+	modem-power-hog {
 		gpio-hog;
 		gpios = <41 GPIO_ACTIVE_HIGH>;
 		output-low;
